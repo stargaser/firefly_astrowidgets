@@ -11,7 +11,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.nddata import CCDData, fits_ccddata_writer
+from astropy.nddata import NDData, CCDData, fits_ccddata_writer
 from astropy.table import Table, vstack
 import astropy.units as u
 from astropy.utils.decorators import deprecated
@@ -144,6 +144,21 @@ class FireflyWidget:
         f = self._viewer.upload_file(fd.name)
         self._viewer.show_fits(f, plot_id='main')
         os.remove(fd.name)
+
+    def load_array(self, arr):
+        """
+        Load a 2D array into the viewer.
+
+        .. note:: Use :meth:`load_nddata` for WCS support.
+
+        Parameters
+        ----------
+        arr : array-like
+            2D array.
+
+        """
+        nd = NDData(arr, unit='DN')
+        self.load_nddata(nd)
 
     @property
     def zoom_level(self):
