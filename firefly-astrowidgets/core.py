@@ -76,7 +76,11 @@ class FireflyWidget:
 
         self._zlevel = 1.0
         self._pixel_offset = 1
-
+        self._stretch_options = ['linear', 'log', 'loglog', 'equal', 'squared',
+                                 'sqrt', 'asinh', 'powerlaw_gamma']
+        self._current_stretch = 'linear'
+        self._autocut_methods = ['minmax', 'zscale']
+        self._stype = self._cut_levels = 'zscale'
 
     def load_fits(self, fitsorfn, numhdu=None, memmap=None):
         """
@@ -209,6 +213,71 @@ class FireflyWidget:
                                  x=point[0] - self._pixel_offset + 1,
                                  y=point[1] - self._pixel_offset + 1,
                                  coord='image')
+
+    @property
+    def stretch_options(self):
+        """
+        List all available options for image stretching.
+        """
+        return self._stretch_options
+
+    @property
+    def stretch(self):
+        """
+        The image stretching algorithm in use.
+        """
+        return self._current_stretch
+
+    @stretch.setter
+    def stretch(self, val):
+        valid_vals = self.stretch_options
+        if val not in valid_vals:
+            raise ValueError('Value must be one of: {}'.format(valid_vals))
+
+        if self._stype in self.autocut_options:
+            self._viewer.set_stretch(plot_id='main', stype=self._stype,
+                                     algorithm=val)
+        else:
+            self._viewer.set_stretch(plot_id='main', stype=self._stype,
+                                     algorithm=val,
+                                     lower_value=self.cuts[0],
+                                     upper_value=self.cuts[1])
+        self._current_stretch = val
+
+    @property
+    def autocut_options(self):
+        """
+        List all available options for image auto-cut.
+        """
+        return self._autocut_methods
+
+    @property
+    def cuts(self):
+        """
+        Current image cut levels.
+        To set new cut levels, either provide a tuple of
+        ``(low, high)`` values or one of the options from
+        `autocut_options`.
+        """
+        return self._cut_levels
+
+    @cuts.setter
+    def cuts(self, val):
+        if isinstance(val, str):  # Autocut
+            valid_vals = self.autocut_options
+            if val not in valid_vals:
+                raise ValueError('Value must be one of: {}'.format(valid_vals))
+            self._viewer.set_stretch(plot_id='main', stype=val,
+                                     algorithm=self._current_stretch)
+            self._stype = val
+            self._cut_levels = val
+        else:  # (low, high)
+            if len(val) > 2:
+                raise ValueError('Value must have length 2.')
+            self._viewer.set_stretch(plot_id='main', stype='absolute',
+                                     lower_value=val[0], upper_value=val[1])
+            self._cut_levels = val
+            self._stype = 'absolute'
 
     def _write_temp_fits(self, hdu):
         """
