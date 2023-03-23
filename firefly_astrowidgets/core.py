@@ -279,6 +279,57 @@ class FireflyWidget:
             self._cut_levels = val
             self._stype = 'absolute'
 
+    def add_markers(self, table, x_colname='x', y_colname='y',
+                    skycoord_colname='coord', use_skycoord=False,
+                    marker_name=None):
+        """
+        Creates markers in the image at given points.
+
+        .. todo::
+
+            Later enhancements to include more columns
+            to control size/style/color of marks,
+
+        Parameters
+        ----------
+        table : `~astropy.table.Table`
+            Table containing marker locations.
+
+        x_colname, y_colname : str
+            Column names for X and Y.
+            Coordinates can be 0- or 1-indexed, as
+            given by ``self.pixel_offset``.
+
+        skycoord_colname : str
+            Column name with ``SkyCoord`` objects.
+
+        use_skycoord : bool
+            If `True`, use ``skycoord_colname`` to mark.
+            Otherwise, use ``x_colname`` and ``y_colname``.
+
+        marker_name : str, optional
+            Name to assign the markers in the table. Providing a name
+            allows markers to be removed by name at a later time.
+        """
+        if use_skycoord is False:
+            print("Using pixel coordinates is not supported")
+            return
+        # Using sky coordinates
+        upload_table = table.copy()
+        if 'ra' not in upload_table.colnames:
+            upload_table['ra'] = upload_table[skycoord_colname].ra.deg
+        if 'dec' not in upload_table.colnames:
+            upload_table['dec'] = upload_table[skycoord_colname].dec.deg
+        print(upload_table)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.fits') as fd:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', AstropyWarning)
+                upload_table.write(fd.name, format="fits", overwrite=True)
+        tval = self._viewer.upload_file(fd.name)
+        self._viewer.show_table(tval, tbl_id=marker_name,
+                                title=marker_name)
+        os.remove(fd.name)
+
     def _write_temp_fits(self, hdu):
         """
         Write a FITS HDU to a temporary location.
