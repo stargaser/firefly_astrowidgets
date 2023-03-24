@@ -81,6 +81,11 @@ class FireflyWidget:
         self._current_stretch = 'linear'
         self._autocut_methods = ['minmax', 'zscale']
         self._stype = self._cut_levels = 'zscale'
+        # Maintain marker tags as a set because we do not want
+        # duplicate names.
+        self._marktags = set()
+        # Let's have a default name for the tag too:
+        self._default_mark_tag_name = 'default-marker-name'
 
     def load_fits(self, fitsorfn, numhdu=None, memmap=None):
         """
@@ -311,24 +316,61 @@ class FireflyWidget:
             Name to assign the markers in the table. Providing a name
             allows markers to be removed by name at a later time.
         """
+        if marker_name is None:
+            marker_name = self._default_mark_tag_name
         if use_skycoord is False:
             print("Using pixel coordinates is not supported")
             return
-        # Using sky coordinates
-        upload_table = table.copy()
-        if 'ra' not in upload_table.colnames:
-            upload_table['ra'] = upload_table[skycoord_colname].ra.deg
-        if 'dec' not in upload_table.colnames:
-            upload_table['dec'] = upload_table[skycoord_colname].dec.deg
-        print(upload_table)
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.fits') as fd:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', AstropyWarning)
-                upload_table.write(fd.name, format="fits", overwrite=True)
-        tval = self._viewer.upload_file(fd.name)
-        self._viewer.show_table(tval, tbl_id=marker_name,
-                                title=marker_name)
-        os.remove(fd.name)
+        else: # Using sky coordinates
+            upload_table = table.copy()
+            if 'ra' not in upload_table.colnames:
+                upload_table['ra'] = upload_table[skycoord_colname].ra.deg
+            if 'dec' not in upload_table.colnames:
+                upload_table['dec'] = upload_table[skycoord_colname].dec.deg
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.fits') as fd:
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', AstropyWarning)
+                    upload_table.write(fd.name, format="fits", overwrite=True)
+            tval = self._viewer.upload_file(fd.name)
+            self._viewer.show_table(tval, tbl_id=marker_name,
+                                    title=marker_name)
+            os.remove(fd.name)
+        self._marktags.add(marker_name)
+
+    def remove_markers(self, marker_name=None):
+        """
+        Remove some but not all of the markers by name used when
+        adding the markers
+
+        Parameters
+        ----------
+
+        marker_name : str, optional
+            Name used when the markers were added.
+        """
+        if marker_name is None:
+            marker_name = self._default_mark_tag_name
+
+        if marker_name not in self._marktags:
+            # This shouldn't have happened, raise an error
+            raise ValueError('Marker name {} not found in current markers.'
+                             ' Markers currently in use are '
+                             '{}'.format(marker_name,
+                                         sorted(self._marktags)))
+
+        self._viewer.dispatch('table.remove',
+                              payload=dict(tbl_id=marker_name))
+        self._marktags.remove(marker_name)
+
+    def reset_markers(self):
+        """
+        Delete all markers.
+        """
+
+        # Grab the entire list of marker names before iterating
+        # otherwise what we are iterating over changes.
+        for marker_name in list(self._marktags):
+            self.remove_markers(marker_name)
 
     def _write_temp_fits(self, hdu):
         """
