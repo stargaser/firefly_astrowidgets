@@ -86,6 +86,14 @@ class FireflyWidget:
         self._marktags = set()
         # Let's have a default name for the tag too:
         self._default_mark_tag_name = 'default-marker-name'
+        # available color maps
+        self._cmaps = dict(gray=0, reversegray=1, colorcube=2, spectrum=3,
+                           falsecolor=4, reversefalsecolor=5,
+                           compressedfalsecolor=6, difference=7, ds9_a=8,
+                           ds9_b=9, ds9_bb=10, ds9_he=11, ds9_i8=12,
+                           ds9_aips=13, ds9_sls=14, ds9_hsv=15, heat=16,
+                           cool=17, rainbow=18, standard=19,
+                           staircase=20, color=21)
 
     def load_fits(self, fitsorfn, numhdu=None, memmap=None):
         """
@@ -283,6 +291,27 @@ class FireflyWidget:
                                      lower_value=val[0], upper_value=val[1])
             self._cut_levels = val
             self._stype = 'absolute'
+
+    @property
+    def colormap_options(self):
+        """List of colormap names."""
+        return list(self._cmaps.keys())
+
+    def set_colormap(self, cmap):
+        """
+        Set colormap to the given colormap name.
+
+        Parameters
+        ----------
+        cmap : str
+            Colormap name. Possible values can be obtained from
+            :meth:`colormap_options`.
+
+        """
+        cbar_id = self._cmaps[cmap]
+        self._viewer.dispatch('ImagePlotCntlr.ColorChange',
+                              payload=dict(plotId='main',
+                                           cbarId=cbar_id))
 
     def add_markers(self, table, x_colname='x', y_colname='y',
                     skycoord_colname='coord', use_skycoord=False,
