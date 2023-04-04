@@ -63,17 +63,21 @@ class FireflyWidget:
 
     """
 
-    def __init__(self, start_browser_tab=False, *args, **kwargs):
+    def __init__(self, use_extension=True, launch_browser=False, *args, **kwargs):
 
         html_file = kwargs.get('html_file',
                                os.environ.get('FIREFLY_HTML', 'slate.html'))
 
-        self._viewer = firefly_client.FireflyClient.make_lab_client(
+        if use_extension:
+            self._viewer = firefly_client.FireflyClient.make_lab_client(
                 start_tab=True, html_file=html_file)
+        else:
+            self._viewer = firefly_client.FireflyClient.make_client(
+                    html_file=html_file, launch_browser=launch_browser)
+            if launch_browser is False:
+                self._viewer.display_url()
 
-        if start_browser_tab:
-            self._viewer.launch_browser()
-
+        self.plot_id = 'main-display'
         self._zlevel = 1.0
         self._pixel_offset = 1
         self._stretch_options = ['linear', 'log', 'loglog', 'equal', 'squared',
@@ -133,7 +137,7 @@ class FireflyWidget:
             temp = True
 
         f = self._viewer.upload_file(fname)
-        self._viewer.show_fits(f, plot_id='main')
+        self._viewer.show_fits(f, plot_id=self.plot_id)
         if temp:
             os.remove(fname)
 
@@ -159,7 +163,7 @@ class FireflyWidget:
                 warnings.simplefilter('ignore', AstropyWarning)
                 fits_ccddata_writer(ccd, fd.name)
         f = self._viewer.upload_file(fd.name)
-        self._viewer.show_fits(f, plot_id='main')
+        self._viewer.show_fits(f, plot_id=self.plot_id)
         os.remove(fd.name)
 
     def load_array(self, arr):
@@ -192,7 +196,7 @@ class FireflyWidget:
     @zoom_level.setter
     def zoom_level(self, val):
         self._zlevel = val
-        self._viewer.set_zoom(plot_id='main', factor=val)
+        self._viewer.set_zoom(plot_id=self.plot_id, factor=val)
 
     def zoom(self, val):
         """
@@ -218,11 +222,11 @@ class FireflyWidget:
             to be in data coordinates.
         """
         if isinstance(point, SkyCoord):
-            self._viewer.set_pan(plot_id='main',
+            self._viewer.set_pan(plot_id=self.plot_id,
                                  x=point.ra.deg, y=point.dec.deg,
                                  coord='J2000')
         else:
-            self._viewer.set_pan(plot_id='main',
+            self._viewer.set_pan(plot_id=self.plot_id,
                                  x=point[0] - self._pixel_offset + 1,
                                  y=point[1] - self._pixel_offset + 1,
                                  coord='image')
@@ -248,10 +252,10 @@ class FireflyWidget:
             raise ValueError('Value must be one of: {}'.format(valid_vals))
 
         if self._stype in self.autocut_options:
-            self._viewer.set_stretch(plot_id='main', stype=self._stype,
+            self._viewer.set_stretch(plot_id=self.plot_id, stype=self._stype,
                                      algorithm=val)
         else:
-            self._viewer.set_stretch(plot_id='main', stype=self._stype,
+            self._viewer.set_stretch(plot_id=self.plot_id, stype=self._stype,
                                      algorithm=val,
                                      lower_value=self.cuts[0],
                                      upper_value=self.cuts[1])
@@ -280,14 +284,14 @@ class FireflyWidget:
             valid_vals = self.autocut_options
             if val not in valid_vals:
                 raise ValueError('Value must be one of: {}'.format(valid_vals))
-            self._viewer.set_stretch(plot_id='main', stype=val,
+            self._viewer.set_stretch(plot_id=self.plot_id, stype=val,
                                      algorithm=self._current_stretch)
             self._stype = val
             self._cut_levels = val
         else:  # (low, high)
             if len(val) > 2:
                 raise ValueError('Value must have length 2.')
-            self._viewer.set_stretch(plot_id='main', stype='absolute',
+            self._viewer.set_stretch(plot_id=self.plot_id, stype='absolute',
                                      lower_value=val[0], upper_value=val[1])
             self._cut_levels = val
             self._stype = 'absolute'
@@ -310,7 +314,7 @@ class FireflyWidget:
         """
         cbar_id = self._cmaps[cmap]
         self._viewer.dispatch('ImagePlotCntlr.ColorChange',
-                              payload=dict(plotId='main',
+                              payload=dict(plotId=self.plot_id,
                                            cbarId=cbar_id))
 
     def add_markers(self, table, x_colname='x', y_colname='y',
